@@ -19,16 +19,22 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.RateLimiter;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.confluent.ksql.GenericRow;
+import io.confluent.ksql.analyzer.ImmutableAnalysis;
 import io.confluent.ksql.analyzer.PullQueryValidator;
+import io.confluent.ksql.analyzer.QueryAnalyzer;
+import io.confluent.ksql.analyzer.RewrittenAnalysis;
 import io.confluent.ksql.api.server.MetricsCallbackHolder;
 import io.confluent.ksql.config.SessionConfig;
 import io.confluent.ksql.engine.KsqlEngine;
 import io.confluent.ksql.engine.PullQueryExecutionUtil;
+import io.confluent.ksql.engine.QueryExecutionUtil;
 import io.confluent.ksql.execution.streams.RoutingFilter.RoutingFilterFactory;
 import io.confluent.ksql.execution.streams.RoutingOptions;
 import io.confluent.ksql.internal.PullQueryExecutorMetrics;
 import io.confluent.ksql.logging.query.QueryLogger;
+import io.confluent.ksql.metastore.model.DataSource;
 import io.confluent.ksql.parser.KsqlParser.PreparedStatement;
 import io.confluent.ksql.parser.tree.PrintTopic;
 import io.confluent.ksql.parser.tree.Query;
@@ -69,16 +75,33 @@ import io.vertx.core.Context;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
+
+import org.apache.kafka.clients.admin.Admin;
+import org.apache.kafka.clients.admin.DescribeTopicsResult;
+import org.apache.kafka.clients.admin.ListConsumerGroupOffsetsResult;
+import org.apache.kafka.clients.admin.TopicDescription;
+import org.apache.kafka.clients.consumer.Consumer;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+import org.apache.kafka.common.KafkaFuture;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.TopicAuthorizationException;
 import org.apache.kafka.streams.StreamsConfig;
+import org.apache.kafka.streams.processor.internals.DefaultKafkaClientSupplier;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -267,54 +290,28 @@ public class StreamedQueryResource implements KsqlConfigurable {
       denyListPropertyValidator.validateAll(configProperties);
 
       if (statement.getStatement() instanceof Query) {
-        final PreparedStatement<Query> queryStmt = (PreparedStatement<Query>) statement;
-        if (queryStmt.getStatement().isPullQuery()) {
-          return handlePullQuery(
-              securityContext.getServiceContext(),
-              queryStmt,
-              configProperties,
-              request.getRequestProperties(),
-              isInternalRequest,
-              connectionClosedFuture,
-              metricsCallbackHolder
-          );
-        }
-
-        // log validated statements for query anonymization
-        QueryLogger.info("Transient query created", statement.getStatementText());
-
-        if (ScalablePushUtil.isScalablePushQuery(statement.getStatement(), ksqlEngine, ksqlConfig,
-            configProperties)) {
-          return handleScalablePushQuery(
-              securityContext.getServiceContext(),
-              queryStmt,
-              configProperties,
-              request.getRequestProperties(),
-              connectionClosedFuture,
-              context
-          );
-        }
-
-        return handlePushQuery(
-            securityContext.getServiceContext(),
-            queryStmt,
-            configProperties,
+        return handleQuery(
+            securityContext,
+            request,
+            (PreparedStatement<Query>) statement,
             connectionClosedFuture,
-            mediaType
+            mediaType,
+            isInternalRequest,
+            metricsCallbackHolder,
+            configProperties,
+            context
         );
-      }
-
-      if (statement.getStatement() instanceof PrintTopic) {
+      } else if (statement.getStatement() instanceof PrintTopic) {
         return handlePrintTopic(
             securityContext.getServiceContext(),
             configProperties,
             (PreparedStatement<PrintTopic>) statement,
             connectionClosedFuture);
+      } else {
+        return Errors.badRequest(String.format(
+            "Statement type `%s' not supported for this resource",
+            statement.getClass().getName()));
       }
-
-      return Errors.badRequest(String.format(
-          "Statement type `%s' not supported for this resource",
-          statement.getClass().getName()));
     } catch (final TopicAuthorizationException e) {
       return errorHandler.accessDeniedFromKafkaResponse(e);
     } catch (final KsqlStatementException e) {
@@ -324,7 +321,109 @@ public class StreamedQueryResource implements KsqlConfigurable {
     }
   }
 
-  private EndpointResponse handlePullQuery(
+  @NotNull
+  private EndpointResponse handleQuery(final KsqlSecurityContext securityContext,
+                                       final KsqlRequest request,
+                                       final PreparedStatement<Query> statement,
+                                       final CompletableFuture<Void> connectionClosedFuture,
+                                       final KsqlMediaType mediaType,
+                                       final Optional<Boolean> isInternalRequest,
+                                       final MetricsCallbackHolder metricsCallbackHolder,
+                                       final Map<String, Object> configProperties,
+                                       final Context context) {
+
+    if (statement.getStatement().isPullQuery()) {
+      final QueryAnalyzer queryAnalyzer = new QueryAnalyzer(ksqlEngine.getMetaStore(), "");
+      final ImmutableAnalysis analysis = new RewrittenAnalysis(
+              queryAnalyzer.analyze(statement.getStatement(), Optional.empty()),
+              new QueryExecutionUtil.ColumnReferenceRewriter()::process
+      );
+      final DataSource dataSource = analysis.getFrom().getDataSource();
+      final DataSource.DataSourceType dataSourceType = dataSource.getDataSourceType();
+      switch (dataSourceType) {
+        case KTABLE:
+          return handleTablePullQuery(
+                  securityContext.getServiceContext(),
+                  statement,
+                  configProperties,
+                  request.getRequestProperties(),
+                  isInternalRequest,
+                  connectionClosedFuture,
+                  metricsCallbackHolder
+          );
+        case KSTREAM:
+          final Map<TopicPartition, Long> endOffsets = getEndOffsets(dataSource);
+          return handleStreamPullQuery(
+                  securityContext.getServiceContext(),
+                  statement,
+                  configProperties,
+                  connectionClosedFuture,
+                  endOffsets
+          );
+        default:
+          throw new KsqlException("Unexpected data source type for pull query: " + dataSourceType);
+      }
+    } else if(ScalablePushUtil.isScalablePushQuery(statement.getStatement(), ksqlEngine, ksqlConfig,
+            configProperties)) {
+      // log validated statements for query anonymization
+      QueryLogger.info("Transient query created", statement.getStatementText());
+      return handleScalablePushQuery(
+              securityContext.getServiceContext(),
+              statement,
+              configProperties,
+              request.getRequestProperties(),
+              connectionClosedFuture,
+              context
+      );
+    } else {
+      // log validated statements for query anonymization
+      QueryLogger.info("Transient query created", statement.getStatementText());
+      return handlePushQuery(
+              securityContext.getServiceContext(),
+              statement,
+              configProperties,
+              connectionClosedFuture,
+              mediaType
+      );
+    }
+  }
+
+  @NotNull
+  private Map<TopicPartition, Long> getEndOffsets(final DataSource dataSource) {
+    final DefaultKafkaClientSupplier defaultKafkaClientSupplier = new DefaultKafkaClientSupplier();
+    // these are not the right configs to pass a consumer.
+    final Map<String, Object> props = ksqlConfig.getKsqlAdminClientConfigProps();
+    try (Admin admin = defaultKafkaClientSupplier
+            .getAdmin(props)) {
+      try (Consumer<byte[], byte[]> consumer =
+                   defaultKafkaClientSupplier.getConsumer(props)) {
+        final String topicName = dataSource.getKafkaTopicName();
+        final DescribeTopicsResult describeTopicsResult =
+                admin.describeTopics(Collections.singletonList(topicName));
+        final KafkaFuture<TopicDescription> topicDescriptionKafkaFuture =
+                describeTopicsResult.values().get(topicName);
+        final TopicDescription topicDescription;
+        try {
+          // Should make this nonblocking
+          topicDescription = topicDescriptionKafkaFuture.get();
+        } catch (InterruptedException | ExecutionException e) {
+          throw new RuntimeException(e);
+        }
+        final List<TopicPartition> topicPartitions =
+                topicDescription
+                        .partitions()
+                        .stream()
+                        .map(td -> new TopicPartition(topicName, td.partition()))
+                        .collect(Collectors.toList());
+        consumer.assign(topicPartitions);
+        consumer.seekToEnd(topicPartitions);
+        return topicPartitions.stream().collect(Collectors.toMap(tp -> tp, consumer::position));
+      }
+    }
+  }
+
+  @NotNull
+  private EndpointResponse handleTablePullQuery(
       final ServiceContext serviceContext,
       final PreparedStatement<Query> statement,
       final Map<String, Object> configOverrides,
@@ -449,6 +548,43 @@ public class StreamedQueryResource implements KsqlConfigurable {
         .executeScalablePushQuery(serviceContext, configured, pushRouting, routingOptions,
             plannerOptions, context);
 
+    final QueryStreamWriter queryStreamWriter = new QueryStreamWriter(
+            query,
+            disconnectCheckInterval.toMillis(),
+            OBJECT_MAPPER,
+            connectionClosedFuture
+    );
+    log.info("Streaming query '{}'", statement.getStatementText());
+    return EndpointResponse.ok(queryStreamWriter);
+  }
+
+  private EndpointResponse handleStreamPullQuery(
+      final ServiceContext serviceContext,
+      final PreparedStatement<Query> statement,
+      final Map<String, Object> streamsProperties,
+      final CompletableFuture<Void> connectionClosedFuture,
+      final Map<TopicPartition, Long> endOffsets) {
+
+    // stream pull queries always start from earliest.
+    streamsProperties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+    streamsProperties.put(StreamsConfig.NUM_STREAM_THREADS_CONFIG, 1);
+    streamsProperties.put(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, 100);
+
+    final ConfiguredStatement<Query> configured = ConfiguredStatement
+        .of(statement, SessionConfig.of(ksqlConfig, streamsProperties));
+
+    if (QueryCapacityUtil.exceedsPushQueryCapacity(ksqlEngine, ksqlRestConfig)) {
+      QueryCapacityUtil.throwTooManyActivePushQueriesException(
+              ksqlEngine,
+              ksqlRestConfig,
+              statement.getStatementText()
+      );
+    }
+
+    final TransientQueryMetadata query = ksqlEngine
+        .executeQuery(serviceContext, configured, false);
+
+    localCommands.ifPresent(lc -> lc.write(query));
 
     final QueryStreamWriter queryStreamWriter = new QueryStreamWriter(
         query,
@@ -457,8 +593,56 @@ public class StreamedQueryResource implements KsqlConfigurable {
         connectionClosedFuture
     );
 
+    // Yes, I know I'm committing a Vert.X sin here.
+    // We need an extra thread because
+    // I couldn't come up with a reliable way to stop the query from
+    // inside Streams, plus our close() method is blocking, so we can't
+    // call it from a StreamThread anyway.
+    // Clearly, this should be done on the worker pool if we were really
+    // taking this approach, but I think we should consider first-class
+    // support of some kind in Streams instead.
+    final ScheduledExecutorService scheduledExecutorService =
+        Executors.newSingleThreadScheduledExecutor(
+            new ThreadFactoryBuilder().setDaemon(true).setNameFormat("john-poc-%d").build()
+        );
+    final Admin admin = Admin.create(ksqlConfig.getKsqlAdminClientConfigProps());
+    scheduledExecutorService.scheduleWithFixedDelay(
+        () -> {
+          if (passedEndOffsets(admin, query, endOffsets)) {
+            log.info("Query '{}' is complete. Closing.", statement.getStatementText());
+            // NOTE: this isn't going to print an end bracket, but it seems to be ok(?)
+            queryStreamWriter.close();
+            admin.close();
+            scheduledExecutorService.shutdown();
+          }
+        },
+        100,
+        50,
+        TimeUnit.MILLISECONDS
+    );
+
     log.info("Streaming query '{}'", statement.getStatementText());
     return EndpointResponse.ok(queryStreamWriter);
+  }
+
+  private boolean passedEndOffsets(final Admin admin,
+                                   final TransientQueryMetadata query,
+                                   final Map<TopicPartition, Long> endOffsets) {
+    try {
+      final ListConsumerGroupOffsetsResult result =
+              admin.listConsumerGroupOffsets(query.getQueryApplicationId());
+      final Map<TopicPartition, OffsetAndMetadata> metadataMap =
+              result.partitionsToOffsetAndMetadata().get();
+      for (Map.Entry<TopicPartition, Long> entry : endOffsets.entrySet()) {
+        final OffsetAndMetadata offsetAndMetadata = metadataMap.get(entry.getKey());
+        if (offsetAndMetadata == null || offsetAndMetadata.offset() < entry.getValue()) {
+          return false;
+        }
+      }
+      return true;
+    } catch (ExecutionException | InterruptedException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   private EndpointResponse handlePushQuery(

@@ -270,7 +270,7 @@ public class KsqlEngine implements KsqlExecutionContext, Closeable {
     try {
       final TransientQueryMetadata query = EngineExecutor
           .create(primaryContext, serviceContext, statement.getSessionConfig())
-          .executeQuery(statement, excludeTombstones);
+          .executeTransientQuery(statement, excludeTombstones);
       return query;
     } catch (final KsqlStatementException e) {
       throw e;
