@@ -15,26 +15,10 @@
 
 package io.confluent.ksql.rest.server;
 
-import static org.hamcrest.CoreMatchers.hasItem;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyMap;
-import static org.mockito.ArgumentMatchers.anyShort;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
-import static org.mockito.Mockito.when;
-
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.RateLimiter;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.confluent.ksql.engine.KsqlEngine;
 import io.confluent.ksql.execution.streams.RoutingFilter.RoutingFilterFactory;
 import io.confluent.ksql.logging.processing.ProcessingLogConfig;
@@ -58,9 +42,9 @@ import io.confluent.ksql.rest.server.computation.CommandRunner;
 import io.confluent.ksql.rest.server.computation.CommandStore;
 import io.confluent.ksql.rest.server.resources.KsqlResource;
 import io.confluent.ksql.rest.server.resources.StatusResource;
-import io.confluent.ksql.rest.util.ConcurrencyLimiter;
 import io.confluent.ksql.rest.server.resources.streaming.StreamedQueryResource;
 import io.confluent.ksql.rest.server.state.ServerState;
+import io.confluent.ksql.rest.util.ConcurrencyLimiter;
 import io.confluent.ksql.security.KsqlSecurityContext;
 import io.confluent.ksql.security.KsqlSecurityExtension;
 import io.confluent.ksql.services.KafkaTopicClient;
@@ -69,14 +53,6 @@ import io.confluent.ksql.util.KsqlConfig;
 import io.confluent.ksql.util.PersistentQueryMetadata;
 import io.confluent.ksql.version.metrics.VersionCheckerAgent;
 import io.vertx.core.Vertx;
-import java.io.File;
-import java.util.Collections;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Queue;
-import java.util.function.Consumer;
 import org.apache.kafka.common.metrics.MetricsReporter;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.log4j.Level;
@@ -91,6 +67,32 @@ import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.MockitoJUnitRunner;
+
+import java.io.File;
+import java.util.Collections;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Queue;
+import java.util.function.Consumer;
+
+import static org.hamcrest.CoreMatchers.hasItem;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.is;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.anyShort;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 
 @RunWith(MockitoJUnitRunner.class)
 public class KsqlRestApplicationTest {
@@ -467,6 +469,7 @@ public class KsqlRestApplicationTest {
     );
   }
 
+  @SuppressFBWarnings("RV_RETURN_VALUE_IGNORED_BAD_PRACTICE")
   @Test
   public void shouldDeleteExtraStateStores() {
     // Given:
@@ -491,6 +494,7 @@ public class KsqlRestApplicationTest {
     assertFalse(fakeStateStore.exists());
   }
 
+  @SuppressFBWarnings("RV_RETURN_VALUE_IGNORED_BAD_PRACTICE")
   @Test
   public void shouldKeepStateStoresBelongingToRunningQueries() {
     // Given:
