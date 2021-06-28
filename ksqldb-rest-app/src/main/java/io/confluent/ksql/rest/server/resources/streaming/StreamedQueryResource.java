@@ -587,7 +587,9 @@ public class StreamedQueryResource implements KsqlConfigurable {
     // query the endOffsets of the input
     final String sourceTopicName = dataSource.getKafkaTopicName();
     final TopicDescription topicDescription = getTopicDescription(sourceTopicName);
-    /*TODO need to set the isolation level to match the Streams app*/
+    // CHECKSTYLE:OFF
+    // TODO need to set the isolation level to match the Streams app
+    // CHECKSTYLE:ON
     final IsolationLevel isolationLevel = IsolationLevel.READ_UNCOMMITTED;
     final Map<TopicPartition, Long> endOffsets = getEndOffsets(topicDescription, isolationLevel);
 
@@ -657,7 +659,9 @@ public class StreamedQueryResource implements KsqlConfigurable {
       log.error("Admin#describeTopics("+ sourceTopicName +") interrupted", e);
       throw new KsqlApiException("Interrupted", HttpResponseStatus.INTERNAL_SERVER_ERROR.code());
     } catch (ExecutionException e) {
+      // CHECKSTYLE:OFF
       // TODO, there's a different logger for query errors, right?
+      // CHECKSTYLE:ON
       log.error("Error executing Admin#describeTopics("+ sourceTopicName +")", e);
       throw new KsqlApiException("Internal Server Error", HttpResponseStatus.INTERNAL_SERVER_ERROR.code());
     } catch (TimeoutException e) {

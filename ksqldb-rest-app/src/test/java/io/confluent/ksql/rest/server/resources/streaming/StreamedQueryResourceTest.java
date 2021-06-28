@@ -145,7 +145,9 @@ import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.mockito.junit.MockitoJUnitRunner;
 
+// CHECKSTYLE:OFF
 @Ignore // TODO need to figure out how to supply an Analyser that will work.
+// CHECKSTYLE:ON
 @RunWith(MockitoJUnitRunner.class)
 @SuppressWarnings("deprecation") // https://github.com/confluentinc/ksql/issues/6639
 public class StreamedQueryResourceTest {
