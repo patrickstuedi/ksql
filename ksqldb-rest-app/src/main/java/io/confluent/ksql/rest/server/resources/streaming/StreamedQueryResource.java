@@ -25,6 +25,7 @@ import io.confluent.ksql.analyzer.ImmutableAnalysis;
 import io.confluent.ksql.analyzer.PullQueryValidator;
 import io.confluent.ksql.analyzer.QueryAnalyzer;
 import io.confluent.ksql.analyzer.RewrittenAnalysis;
+import io.confluent.ksql.api.server.KsqlApiException;
 import io.confluent.ksql.api.server.MetricsCallbackHolder;
 import io.confluent.ksql.config.SessionConfig;
 import io.confluent.ksql.engine.KsqlEngine;
@@ -86,24 +87,30 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
+import io.netty.handler.codec.http.HttpResponseStatus;
 import org.apache.kafka.clients.admin.Admin;
-import org.apache.kafka.clients.admin.DescribeTopicsResult;
 import org.apache.kafka.clients.admin.ListConsumerGroupOffsetsResult;
+import org.apache.kafka.clients.admin.ListOffsetsOptions;
+import org.apache.kafka.clients.admin.ListOffsetsResult;
+import org.apache.kafka.clients.admin.OffsetSpec;
 import org.apache.kafka.clients.admin.TopicDescription;
-import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+import org.apache.kafka.common.IsolationLevel;
 import org.apache.kafka.common.KafkaFuture;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.TopicAuthorizationException;
 import org.apache.kafka.streams.StreamsConfig;
-import org.apache.kafka.streams.processor.internals.DefaultKafkaClientSupplier;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static java.util.function.Function.identity;
+import static java.util.stream.Collectors.toMap;
 
 @SuppressWarnings({"ClassDataAbstractionCoupling"})
 public class StreamedQueryResource implements KsqlConfigurable {
@@ -131,6 +138,7 @@ public class StreamedQueryResource implements KsqlConfigurable {
 
   private KsqlConfig ksqlConfig;
   private KsqlRestConfig ksqlRestConfig;
+  private Admin admin;
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   public StreamedQueryResource(
@@ -225,6 +233,7 @@ public class StreamedQueryResource implements KsqlConfigurable {
     }
 
     ksqlConfig = config;
+    admin = Admin.create(config.getKsqlAdminClientConfigProps());
   }
 
   public EndpointResponse streamQuery(
@@ -352,13 +361,12 @@ public class StreamedQueryResource implements KsqlConfigurable {
                   metricsCallbackHolder
           );
         case KSTREAM:
-          final Map<TopicPartition, Long> endOffsets = getEndOffsets(dataSource);
           return handleStreamPullQuery(
                   securityContext.getServiceContext(),
+                  dataSource,
                   statement,
                   configProperties,
-                  connectionClosedFuture,
-                  endOffsets
+                  connectionClosedFuture
           );
         default:
           throw new KsqlException("Unexpected data source type for pull query: " + dataSourceType);
@@ -385,40 +393,6 @@ public class StreamedQueryResource implements KsqlConfigurable {
               connectionClosedFuture,
               mediaType
       );
-    }
-  }
-
-  @NotNull
-  private Map<TopicPartition, Long> getEndOffsets(final DataSource dataSource) {
-    final DefaultKafkaClientSupplier defaultKafkaClientSupplier = new DefaultKafkaClientSupplier();
-    // these are not the right configs to pass a consumer.
-    final Map<String, Object> props = ksqlConfig.getKsqlAdminClientConfigProps();
-    try (Admin admin = defaultKafkaClientSupplier
-            .getAdmin(props)) {
-      try (Consumer<byte[], byte[]> consumer =
-                   defaultKafkaClientSupplier.getConsumer(props)) {
-        final String topicName = dataSource.getKafkaTopicName();
-        final DescribeTopicsResult describeTopicsResult =
-                admin.describeTopics(Collections.singletonList(topicName));
-        final KafkaFuture<TopicDescription> topicDescriptionKafkaFuture =
-                describeTopicsResult.values().get(topicName);
-        final TopicDescription topicDescription;
-        try {
-          // Should make this nonblocking
-          topicDescription = topicDescriptionKafkaFuture.get();
-        } catch (InterruptedException | ExecutionException e) {
-          throw new RuntimeException(e);
-        }
-        final List<TopicPartition> topicPartitions =
-                topicDescription
-                        .partitions()
-                        .stream()
-                        .map(td -> new TopicPartition(topicName, td.partition()))
-                        .collect(Collectors.toList());
-        consumer.assign(topicPartitions);
-        consumer.seekToEnd(topicPartitions);
-        return topicPartitions.stream().collect(Collectors.toMap(tp -> tp, consumer::position));
-      }
     }
   }
 
@@ -560,10 +534,10 @@ public class StreamedQueryResource implements KsqlConfigurable {
 
   private EndpointResponse handleStreamPullQuery(
       final ServiceContext serviceContext,
+      final DataSource dataSource,
       final PreparedStatement<Query> statement,
       final Map<String, Object> streamsProperties,
-      final CompletableFuture<Void> connectionClosedFuture,
-      final Map<TopicPartition, Long> endOffsets) {
+      final CompletableFuture<Void> connectionClosedFuture) {
 
     // stream pull queries always start from earliest.
     streamsProperties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
@@ -605,24 +579,90 @@ public class StreamedQueryResource implements KsqlConfigurable {
         Executors.newSingleThreadScheduledExecutor(
             new ThreadFactoryBuilder().setDaemon(true).setNameFormat("john-poc-%d").build()
         );
-    final Admin admin = Admin.create(ksqlConfig.getKsqlAdminClientConfigProps());
-    scheduledExecutorService.scheduleWithFixedDelay(
-        () -> {
-          if (passedEndOffsets(admin, query, endOffsets)) {
-            log.info("Query '{}' is complete. Closing.", statement.getStatementText());
-            // NOTE: this isn't going to print an end bracket, but it seems to be ok(?)
-            queryStreamWriter.close();
-            admin.close();
-            scheduledExecutorService.shutdown();
-          }
-        },
-        100,
-        50,
-        TimeUnit.MILLISECONDS
-    );
 
     log.info("Streaming query '{}'", statement.getStatementText());
+
+    // query the endOffsets of the input
+    final String sourceTopicName = dataSource.getKafkaTopicName();
+    final TopicDescription topicDescription = getTopicDescription(sourceTopicName);
+    /*TODO need to set the isolation level to match the Streams app*/
+    final IsolationLevel isolationLevel = IsolationLevel.READ_UNCOMMITTED;
+    final Map<TopicPartition, Long> endOffsets = getEndOffsets(topicDescription, isolationLevel);
+
+    // wait for the query to pass the endOffsets
+    while(!passedEndOffsets(admin, query, endOffsets)) {
+      try {
+        Thread.sleep(50L);
+      } catch (InterruptedException e) {
+        log.error("Interrupted waiting for stream pull query to complete", e);
+        throw new KsqlApiException("Interrupted", HttpResponseStatus.INTERNAL_SERVER_ERROR.code());
+      }
+    }
+
+    // cancel the query
+    queryStreamWriter.close();
+
     return EndpointResponse.ok(queryStreamWriter);
+  }
+
+  @NotNull
+  private Map<TopicPartition, Long> getEndOffsets(TopicDescription topicDescription, IsolationLevel isolationLevel) {
+    final Map<TopicPartition, Long> endOffsets;
+    final Map<TopicPartition, OffsetSpec> topicPartitions =
+            topicDescription
+                    .partitions()
+                    .stream()
+                    .map(td -> new TopicPartition(topicDescription.name(), td.partition()))
+                    .collect(toMap(identity(), tp -> OffsetSpec.latest()));
+
+    final ListOffsetsResult listOffsetsResult = admin.listOffsets(
+            topicPartitions,
+            new ListOffsetsOptions(
+                    isolationLevel
+            )
+    );
+
+    try {
+      final Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> partitionResultMap =
+              listOffsetsResult.all().get(10, TimeUnit.SECONDS);
+      endOffsets = partitionResultMap
+              .entrySet()
+              .stream()
+              .collect(toMap(Map.Entry::getKey, e -> e.getValue().offset()));
+    } catch (InterruptedException e) {
+      log.error("Admin#listOffsets("+ topicDescription.name() +") interrupted", e);
+      throw new KsqlApiException("Interrupted", HttpResponseStatus.INTERNAL_SERVER_ERROR.code());
+    } catch (ExecutionException e) {
+      log.error("Error executing Admin#listOffsets("+ topicDescription.name() +")", e);
+      throw new KsqlApiException("Internal Server Error", HttpResponseStatus.INTERNAL_SERVER_ERROR.code());
+    } catch (TimeoutException e) {
+      log.error("Admin#listOffsets("+ topicDescription.name() +") timed out", e);
+      throw new KsqlApiException("Backend timed out", HttpResponseStatus.INTERNAL_SERVER_ERROR.code());
+    }
+    return endOffsets;
+  }
+
+  private TopicDescription getTopicDescription(String sourceTopicName) {
+    final TopicDescription topicDescription;
+    final KafkaFuture<TopicDescription> topicDescriptionKafkaFuture = admin
+            .describeTopics(Collections.singletonList(sourceTopicName))
+            .values()
+            .get(sourceTopicName);
+
+    try {
+      topicDescription = topicDescriptionKafkaFuture.get(10, TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+      log.error("Admin#describeTopics("+ sourceTopicName +") interrupted", e);
+      throw new KsqlApiException("Interrupted", HttpResponseStatus.INTERNAL_SERVER_ERROR.code());
+    } catch (ExecutionException e) {
+      // TODO, there's a different logger for query errors, right?
+      log.error("Error executing Admin#describeTopics("+ sourceTopicName +")", e);
+      throw new KsqlApiException("Internal Server Error", HttpResponseStatus.INTERNAL_SERVER_ERROR.code());
+    } catch (TimeoutException e) {
+      log.error("Admin#describeTopics("+ sourceTopicName +") timed out", e);
+      throw new KsqlApiException("Backend timed out", HttpResponseStatus.INTERNAL_SERVER_ERROR.code());
+    }
+    return topicDescription;
   }
 
   private boolean passedEndOffsets(final Admin admin,
