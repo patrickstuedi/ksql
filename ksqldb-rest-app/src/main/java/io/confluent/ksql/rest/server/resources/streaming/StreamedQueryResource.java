@@ -522,13 +522,15 @@ public class StreamedQueryResource implements KsqlConfigurable {
         .executeScalablePushQuery(serviceContext, configured, pushRouting, routingOptions,
             plannerOptions, context);
 
+
     final QueryStreamWriter queryStreamWriter = new QueryStreamWriter(
-            query,
-            disconnectCheckInterval.toMillis(),
-            OBJECT_MAPPER,
-            connectionClosedFuture
+        query,
+        disconnectCheckInterval.toMillis(),
+        OBJECT_MAPPER,
+        connectionClosedFuture
     );
-    log.info("Streaming query '{}'", statement.getStatementText());
+
+    QueryLogger.info("Streaming query ", statement.getStatementText());
     return EndpointResponse.ok(queryStreamWriter);
   }
 
@@ -580,7 +582,7 @@ public class StreamedQueryResource implements KsqlConfigurable {
             new ThreadFactoryBuilder().setDaemon(true).setNameFormat("john-poc-%d").build()
         );
 
-    log.info("Streaming query '{}'", statement.getStatementText());
+    QueryLogger.info("Streaming query '{}'", statement.getStatementText());
 
     // query the endOffsets of the input
     final String sourceTopicName = dataSource.getKafkaTopicName();

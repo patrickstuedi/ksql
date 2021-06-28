@@ -72,7 +72,6 @@ import org.apache.kafka.connect.data.Timestamp;
 import org.hamcrest.CoreMatchers;
 import org.hamcrest.Matcher;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.junit.MockitoJUnitRunner;
@@ -238,7 +237,7 @@ public class KsqlAvroSerializerTest {
     assertThat(avroSchemaStoredInSchemaRegistry(), is(ORDER_AVRO_SCHEMA));
   }
 
-  @Ignore // this test is brittle. Different JVMs print this message differently
+  // TODO this test is brittle. Different JVMs print this message differently
   @Test
   public void shouldThrowIfNotStruct() {
     // Given:
@@ -465,7 +464,7 @@ public class KsqlAvroSerializerTest {
     assertThat(avroSchemaStoredInSchemaRegistry(), is(BOOLEAN_ARRAY_AVRO_SCHEMA));
   }
 
-  @Ignore // this test is brittle. Different JVMs print this message differently
+  // TODO this test is brittle. Different JVMs print this message differently
   @Test
   public void shouldThrowIfNotArray() {
     // Given:
@@ -599,7 +598,6 @@ public class KsqlAvroSerializerTest {
     assertThat(deserialize, matcher);
   }
 
-  @Ignore
   @Test
   public void shouldSerializeArrayOfStruct() {
     // Given:
@@ -655,7 +653,7 @@ public class KsqlAvroSerializerTest {
     assertThat(avroSchemaStoredInSchemaRegistry(), is(OPTIONAL_KEY_MAP_AVRO_SCHEMA));
   }
 
-  @Ignore // this test is brittle. Different JVMs print this message differently
+  // TODO this test is brittle. Different JVMs print this message differently
   @Test
   public void shouldThrowIfNotMap() {
     // Given:
