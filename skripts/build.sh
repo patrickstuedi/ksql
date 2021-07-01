@@ -1,1 +1,1 @@
-./mvnw clean install -DskipTests
+./mvnw package -DskipTests
