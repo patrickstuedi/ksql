@@ -19,15 +19,7 @@ import io.confluent.ksql.function.FunctionCategory;
 import io.confluent.ksql.function.udf.Udf;
 import io.confluent.ksql.function.udf.UdfDescription;
 import io.confluent.ksql.function.udf.UdfParameter;
-import io.confluent.ksql.function.udf.UdfSchemaProvider;
-import io.confluent.ksql.schema.ksql.SqlArgument;
-import io.confluent.ksql.schema.ksql.types.SqlBaseType;
-import io.confluent.ksql.schema.ksql.types.SqlType;
 import io.confluent.ksql.util.KsqlConstants;
-import io.confluent.ksql.util.KsqlException;
-
-import java.math.BigDecimal;
-import java.util.List;
 
 @UdfDescription(
         name = "Mod",
@@ -38,24 +30,18 @@ import java.util.List;
 
 public class Mod {
 
-    static final String DESCRIPTION = "Returns the modulo value of its argument according to a modulo n";
+    static final String DESCRIPTION = "Returns the modulo value of its arguments. Returns null if one of the arguments is null";
 
 
     @Udf
     public Integer mod(@UdfParameter final Integer a, @UdfParameter final Integer n) {
-        if (a == null || n == null){
-            return null;
-        }
-        return a % n;
+        Integer res = isValid(a,n) ? mod(a.doubleValue(), n.doubleValue()) : null;
+        return res;
     }
 
     @Udf
     public Long mod(@UdfParameter final Long a, @UdfParameter final Long n) {
-        if (a == null || n == null){
-            return null;
-        }
-
-        return a % n;
+        return isValid(a,n) ? mod(a.doubleValue(), n.doubleValue()) : null;
     }
 
     @Udf
@@ -64,23 +50,15 @@ public class Mod {
             return null;
         }
 
-        return a % n;
+        double res = a.doubleValue() % n.doubleValue();
+        return new Double(res);
     }
 
-    /*
-    @Udf(schemaProvider = "absDecimalProvider")
-    public BigDecimal mod(@UdfParameter final BigDecimal val) {
-        return (val == null) ? null : val.abs();
-    }
-
-    @UdfSchemaProvider
-    public SqlType absDecimalProvider(final List<SqlArgument> params) {
-        final SqlType s = params.get(0).getSqlTypeOrThrow();
-        if (s.baseType() != SqlBaseType.DECIMAL) {
-            throw new KsqlException("The schema provider method for Abs expects a BigDecimal parameter"
-                    + "type");
+    private <T> boolean isValid(T a, T n){
+        if (a == null || n == null){
+            return false;
         }
-        return s;
+        return true;
     }
-    */
+
 }

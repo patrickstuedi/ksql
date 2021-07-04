@@ -1,1 +1,1 @@
-./mvnw install -DskipTests=true -Dcheckstyle.skip=true -Dspotbugs.skip=true
+./mvnw package -DskipTests=true -Dcheckstyle.skip=true -Dspotbugs.skip=true
