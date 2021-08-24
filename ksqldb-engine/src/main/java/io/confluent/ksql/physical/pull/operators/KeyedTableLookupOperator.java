@@ -43,7 +43,8 @@ public class KeyedTableLookupOperator
 
   private ImmutableList<KsqlPartitionLocation> partitionLocations;
   private Iterator<Row> resultIterator;
-  private Iterator<GenericKey> keyIterator;
+  //private Iterator<GenericKey> keyIterator;
+  private Iterator<KsqlKey> keyIterator;
   private Iterator<KsqlPartitionLocation> partitionLocationIterator;
   private KsqlPartitionLocation nextLocation;
   private GenericKey nextKey;
@@ -65,9 +66,10 @@ public class KeyedTableLookupOperator
       if (!nextLocation.getKeys().isPresent()) {
         throw new IllegalStateException("Table lookup queries should be done with keys");
       }
-      keyIterator = nextLocation.getKeys().get().stream().map(KsqlKey::getKey).iterator();
+      keyIterator = nextLocation.getKeys().get().stream().iterator();
       if (keyIterator.hasNext()) {
-        nextKey = keyIterator.next();
+        KsqlKey _key = keyIterator.next();
+        nextKey = _key.getKey();
         resultIterator = mat.nonWindowed()
             .get(nextKey, nextLocation.getPartition())
             .map(ImmutableList::of)
@@ -90,9 +92,10 @@ public class KeyedTableLookupOperator
         if (!nextLocation.getKeys().isPresent()) {
           throw new IllegalStateException("Table lookup queries should be done with keys");
         }
-        keyIterator = nextLocation.getKeys().get().stream().map(KsqlKey::getKey).iterator();
+        keyIterator = nextLocation.getKeys().get().stream().iterator();
       }
-      nextKey = keyIterator.next();
+      KsqlKey _key = keyIterator.next();
+      nextKey = _key.getKey();
       resultIterator = mat.nonWindowed()
           .get(nextKey, nextLocation.getPartition())
           .map(ImmutableList::of)
