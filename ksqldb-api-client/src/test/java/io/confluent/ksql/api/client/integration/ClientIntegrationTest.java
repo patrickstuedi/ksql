@@ -69,6 +69,7 @@ import io.confluent.ksql.api.client.impl.ConnectorTypeImpl;
 import io.confluent.ksql.api.client.util.ClientTestUtil.TestSubscriber;
 import io.confluent.ksql.api.client.util.RowUtil;
 import io.confluent.ksql.engine.KsqlEngine;
+import io.confluent.ksql.execution.streams.StreamFilterBuilder;
 import io.confluent.ksql.integration.IntegrationTestHarness;
 import io.confluent.ksql.integration.Retry;
 import io.confluent.ksql.name.ColumnName;
@@ -109,6 +110,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -394,7 +396,10 @@ public class ClientIntegrationTest {
   @Test
   public void shouldStreamPullQueryOnTableSync() throws Exception {
     // When
-    final StreamedQueryResult streamedQueryResult = client.streamQuery(PULL_QUERY_ON_TABLE).get();
+    CompletableFuture<StreamedQueryResult> future = client.streamQuery(PULL_QUERY_ON_TABLE);
+    System.out.println("### future type " + future.getClass().getName());
+    final StreamedQueryResult streamedQueryResult = future.get();
+    //final StreamedQueryResult streamedQueryResult = client.streamQuery(PULL_QUERY_ON_TABLE).get();
 
     // Then
     assertThat(streamedQueryResult.columnNames(), is(PULL_QUERY_COLUMN_NAMES));
@@ -406,6 +411,9 @@ public class ClientIntegrationTest {
     assertThat(streamedQueryResult.poll(), is(nullValue()));
 
     assertThatEventually(streamedQueryResult::isComplete, is(true));
+
+    client.close();
+    System.out.println("### done");
   }
 
   @Test

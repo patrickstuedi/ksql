@@ -100,6 +100,11 @@ public class PullPhysicalPlanBuilder {
    * @return the root node of the tree of physical operators
    */
   public PullPhysicalPlan buildPullPhysicalPlan(final LogicalPlanNode logicalPlanNode) {
+//    if (logicalPlanNode != null){
+//      throw new KsqlException("###Test: Pull queries expect the root of the logical plan to be a "
+//        + "KsqlBareOutputNode.");
+//    }
+
     DataSourceOperator dataSourceOperator = null;
 
     final OutputNode outputNode = logicalPlanNode.getNode()
