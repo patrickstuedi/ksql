@@ -119,6 +119,7 @@ public class Cli implements KsqlRequestExecutor, Closeable {
 
   private boolean isBenchmark;
   private boolean printHeader;
+  private String rangeKey;
 
   public static Cli build(
       final Long streamedQueryRowLimit,
@@ -147,6 +148,7 @@ public class Cli implements KsqlRequestExecutor, Closeable {
     this.sessionVariables = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
     this.isBenchmark = false;
     this.printHeader = false;
+    this.rangeKey = "null";
 
     final Supplier<String> versionSuppler =
         () -> restClient.getServerInfo().getResponse().getVersion();
@@ -165,6 +167,7 @@ public class Cli implements KsqlRequestExecutor, Closeable {
     sessionVariables.putAll(vars);
     this.isBenchmark = sessionVariables.containsKey("benchmark") ? Boolean.parseBoolean(sessionVariables.get("benchmark")) : false;
     this.printHeader = sessionVariables.containsKey("print-header") ? Boolean.parseBoolean(sessionVariables.get("print-header")) : false;
+    this.rangeKey = sessionVariables.containsKey("rangekey") ? sessionVariables.get("rangekey") : "null";
   }
 
   @Override
@@ -534,9 +537,9 @@ public class Cli implements KsqlRequestExecutor, Closeable {
     if (isBenchmark) {
       if (printHeader){
         //terminal.printError("# total\texec\tprint", "");
-        System.out.println("# total\texec\tprint");
+        System.out.println("# key\t\ttotal\t\texec\t\tprint");
       }
-      String benchmark_result = "" + totalTime + "\t" + queryExecTime + "\t" + printingTime;
+      String benchmark_result = "" +rangeKey + "\t" + totalTime + "\t\t" + queryExecTime + "\t\t" + printingTime;
       //terminal.printError(benchmark_result, "");
       System.out.println(benchmark_result);
     }
