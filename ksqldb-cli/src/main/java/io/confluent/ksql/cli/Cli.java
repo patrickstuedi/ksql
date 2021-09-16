@@ -117,6 +117,9 @@ public class Cli implements KsqlRequestExecutor, Closeable {
 
   private final Map<String, String> sessionVariables;
 
+  private boolean isBenchmark;
+  private boolean printHeader;
+
   public static Cli build(
       final Long streamedQueryRowLimit,
       final Long streamedQueryTimeoutMs,
@@ -136,12 +139,14 @@ public class Cli implements KsqlRequestExecutor, Closeable {
     Objects.requireNonNull(restClient, "Must provide the CLI with a REST client");
     Objects.requireNonNull(terminal, "Must provide the CLI with a terminal");
 
-    this.streamedQueryRowLimit = streamedQueryRowLimit;
-    this.streamedQueryTimeoutMs = streamedQueryTimeoutMs;
+    this.streamedQueryRowLimit = null;
+    this.streamedQueryTimeoutMs = null;
     this.restClient = restClient;
     this.terminal = terminal;
     this.remoteServerState = new RemoteServerState();
     this.sessionVariables = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+    this.isBenchmark = false;
+    this.printHeader = false;
 
     final Supplier<String> versionSuppler =
         () -> restClient.getServerInfo().getResponse().getVersion();
@@ -158,6 +163,8 @@ public class Cli implements KsqlRequestExecutor, Closeable {
 
   public void addSessionVariables(final Map<String, String> vars) {
     sessionVariables.putAll(vars);
+    this.isBenchmark = sessionVariables.containsKey("benchmark") ? Boolean.parseBoolean(sessionVariables.get("benchmark")) : false;
+    this.printHeader = sessionVariables.containsKey("print-header") ? Boolean.parseBoolean(sessionVariables.get("print-header")) : false;
   }
 
   @Override
@@ -479,8 +486,13 @@ public class Cli implements KsqlRequestExecutor, Closeable {
       final String statement,
       final SqlBaseParser.QueryStatementContext query
   ) {
+    long start = System.nanoTime();
     final RestResponse<StreamPublisher<StreamedRow>> queryResponse =
         makeKsqlRequest(statement, restClient::makeQueryRequestStreamed);
+    long afterQuery = System.nanoTime();
+    long queryExecTime = (afterQuery - start)/1000/1000;
+    long printingTime = 0;
+    long totalTime = queryExecTime;
 
     if (!queryResponse.isSuccessful()) {
       terminal.printErrorMessage(queryResponse.getErrorMessage());
@@ -505,14 +517,28 @@ public class Cli implements KsqlRequestExecutor, Closeable {
           } else {
             future.get();
           }
+          long afterOutput = System.nanoTime();
+          printingTime = (afterOutput - afterQuery)/1000/1000;
+          totalTime = queryExecTime + printingTime;
         } catch (Exception e) {
           LOGGER.error("Unexpected exception in waiting for query", e);
         } finally {
-          terminal.writer().println("Query terminated");
-          terminal.flush();
+          if (!isBenchmark) {
+            terminal.writer().println("Query terminated");
+            terminal.flush();
+          }
           publisher.close();
         }
       }
+    }
+    if (isBenchmark) {
+      if (printHeader){
+        //terminal.printError("# total\texec\tprint", "");
+        System.out.println("# total\texec\tprint");
+      }
+      String benchmark_result = "" + totalTime + "\t" + queryExecTime + "\t" + printingTime;
+      //terminal.printError(benchmark_result, "");
+      System.out.println(benchmark_result);
     }
   }
 
@@ -573,14 +599,16 @@ public class Cli implements KsqlRequestExecutor, Closeable {
 
     // set property
     final Object priorValue = restClient.setProperty(property, value);
-    terminal.writer().printf(
+    if (!isBenchmark) {
+      terminal.writer().printf(
         "Successfully changed local property '%s'%s to '%s'.%s%n",
         property,
         priorValue == null ? "" : " from '" + priorValue + "'",
         value,
         priorValue == null ? " Use the UNSET command to revert your change." : ""
-    );
-    terminal.flush();
+      );
+      terminal.flush();
+    }
   }
 
   @SuppressWarnings("unused")
@@ -712,8 +740,10 @@ public class Cli implements KsqlRequestExecutor, Closeable {
       if (closed) {
         return;
       }
-      terminal.printStreamedRow(row);
-      terminal.flush();
+      if (!isBenchmark){
+        terminal.printStreamedRow(row);
+        terminal.flush();
+      }
       if (row.isTerminal()) {
         future.complete(null);
         close();

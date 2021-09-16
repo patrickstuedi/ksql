@@ -37,6 +37,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import org.apache.avro.Schema;
+import org.apache.avro.Schema.Type;
 import org.apache.avro.generic.GenericData.Record;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.kafka.connect.data.ConnectSchema;
@@ -56,6 +57,8 @@ public class RowGenerator {
   private final LogicalSchema schema;
   private final int keyFieldIndex;
   private final Optional<Integer> timestampFieldIndex;
+  private int messageCounter;
+  private final String keyFieldName;
 
   public RowGenerator(
       final Generator generator,
@@ -73,6 +76,8 @@ public class RowGenerator {
         .map(column -> Optional.of(column.index()))
         .orElseThrow(IllegalStateException::new)
         : Optional.empty();
+    this.messageCounter = 1;
+    this.keyFieldName = keyFieldName;
   }
 
   public LogicalSchema schema() {
@@ -104,10 +109,9 @@ public class RowGenerator {
      */
     String sessionisationValue = null;
     for (final Schema.Field field : generator.schema().getFields()) {
-
       final boolean isSession = field.schema().getProp("session") != null;
       final boolean isSessionSiblingIntHash =
-          field.schema().getProp("session-sibling-int-hash") != null;
+        field.schema().getProp("session-sibling-int-hash") != null;
       final String timeFormatFromLong = field.schema().getProp("format_as_time");
 
       if (isSession) {
@@ -121,10 +125,10 @@ public class RowGenerator {
         // super cheeky hack to link int-ids to session-values - if anything fails then we use
         // the 'avro-gen' randomised version
         handleSessionSiblingField(
-            randomAvroMessage,
-            row,
-            sessionisationValue,
-            field
+          randomAvroMessage,
+          row,
+          sessionisationValue,
+          field
         );
 
       } else if (timeFormatFromLong != null) {
@@ -137,6 +141,10 @@ public class RowGenerator {
           }
           row.append(timeformatter.format(date));
         }
+      } else if (keyFieldName.equalsIgnoreCase(field.name()) && field.schema().getType() == Type.STRING) {
+        final Object value = String.format("%010d", messageCounter);
+        messageCounter++;
+        row.append(value);
       } else {
         final Object value = randomAvroMessage.get(field.name());
         if (value instanceof Record) {
