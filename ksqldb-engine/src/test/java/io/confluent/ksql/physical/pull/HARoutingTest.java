@@ -217,6 +217,62 @@ public class HARoutingTest {
   }
 
   @Test
+  public void shouldCallRouteQuery_success_benchmark() throws InterruptedException, ExecutionException {
+    // Given:
+    locate(location1, location2, location3, location4);
+    doAnswer(i -> {
+      final PullQueryQueue queue = i.getArgument(1);
+      queue.acceptRow(PQ_ROW1);
+      return null;
+    }).when(pullPhysicalPlan).execute(eq(ImmutableList.of(location1)), any(), any());
+    doNothing().when(pullPhysicalPlan).execute(eq(ImmutableList.of(location3)), any(), any());
+    when(ksqlClient.makeQueryRequest(eq(node2.location()), any(), any(), any(), any(), any())).thenAnswer(
+      new Answer() {
+        private int count = 0;
+
+        public Object answer(InvocationOnMock i) {
+          Map<String, ?> requestProperties = i.getArgument(3);
+          Consumer<List<StreamedRow>> rowConsumer = i.getArgument(4);
+          if (requestProperties.get(KsqlRequestConfig.KSQL_REQUEST_QUERY_PULL_PARTITIONS).toString().equalsIgnoreCase("2")) {
+            //assertThat(count, is(0));
+          }
+          if (requestProperties.get(KsqlRequestConfig.KSQL_REQUEST_QUERY_PULL_PARTITIONS).toString().equalsIgnoreCase("4")) {
+            //assertThat(count, is(1));
+            rowConsumer.accept(
+              ImmutableList.of(StreamedRow.header(queryId, logicalSchema),
+                StreamedRow.pullRow(GenericRow.fromList(ROW2), Optional.empty())));
+          }
+          count++;
+          return RestResponse.successful(200, 2);
+        }
+      }
+    );
+
+    // When:
+    long start = System.nanoTime();
+    for (int i = 0; i < 1000; i++){
+      CompletableFuture<Void> future = haRouting.handlePullQuery(
+        serviceContext, pullPhysicalPlan, statement, routingOptions, logicalSchema, queryId,
+        pullQueryQueue, disconnect);
+      future.get();
+    }
+    long end = System.nanoTime();
+    long diff = (end-start)/1000/1000;
+    System.out.println("### benchmark success, time " + diff);
+
+
+    // Then:
+    /*
+    verify(pullPhysicalPlan).execute(eq(ImmutableList.of(location1)), any(), any());
+    verify(pullPhysicalPlan).execute(eq(ImmutableList.of(location3)), any(), any());
+    verify(ksqlClient, times(2)).makeQueryRequest(eq(node2.location()), any(), any(), any(), any(), any());
+    assertThat(pullQueryQueue.size(), is(2));
+    assertThat(pullQueryQueue.pollRow(1, TimeUnit.SECONDS).getRow(), is(ROW1));
+    assertThat(pullQueryQueue.pollRow(1, TimeUnit.SECONDS).getRow(), is(ROW2));
+    */
+  }
+
+  @Test
   public void shouldCallRouteQuery_twoRound() throws InterruptedException, ExecutionException {
     // Given:
     locate(location1, location2, location3, location4);
