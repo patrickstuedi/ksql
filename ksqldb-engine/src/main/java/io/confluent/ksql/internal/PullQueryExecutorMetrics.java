@@ -57,6 +57,8 @@ public class PullQueryExecutorMetrics implements Closeable {
   private final List<Sensor> sensors;
   private final Sensor localRequestsSensor;
   private final Sensor remoteRequestsSensor;
+  private final Sensor partitionFetchSensor;
+  private final Sensor resubmissionRequestsSensor;
   private final Sensor latencySensor;
   private final Map<MetricsKey, Sensor> latencySensorMap;
   private final Sensor requestRateSensor;
@@ -97,6 +99,8 @@ public class PullQueryExecutorMetrics implements Closeable {
     this.sensors = new ArrayList<>();
     this.localRequestsSensor = configureLocalRequestsSensor();
     this.remoteRequestsSensor = configureRemoteRequestsSensor();
+    this.partitionFetchSensor = configurePartitionFetchSensor();
+    this.resubmissionRequestsSensor = configureResubmissionRequestsSensor();
     this.latencySensor = configureLatencySensor();
     this.latencySensorMap = configureLatencySensorMap();
     this.requestRateSensor = configureRateSensor();
@@ -124,6 +128,15 @@ public class PullQueryExecutorMetrics implements Closeable {
 
   public void recordRemoteRequests(final double value) {
     this.remoteRequestsSensor.record(value);
+  }
+
+  public void recordPartitionFetchRequest(final double value) {
+    this.partitionFetchSensor.record(value);
+  }
+
+  public void recordResubmissionRequest(final double value) {
+    this.partitionFetchSensor.record(value);
+    this.resubmissionRequestsSensor.record(value);
   }
 
   public void recordLatency(
@@ -354,6 +367,94 @@ public class PullQueryExecutorMetrics implements Closeable {
         PULL_REQUESTS + "-remote-rate",
         ksqlServicePrefix + PULL_QUERY_METRIC_GROUP,
         "Rate of remote pull query requests",
+        customMetricsTags,
+        new Rate()
+    );
+
+    sensors.add(sensor);
+    return sensor;
+  }
+
+  private Sensor configurePartitionFetchSensor() {
+    final Sensor sensor = metrics.sensor(
+        PULL_QUERY_METRIC_GROUP + "-" + PULL_REQUESTS + "-partition-fetch");
+
+    // legacy
+    addSensor(
+        sensor,
+        PULL_REQUESTS + "-partition-fetch-count",
+        ksqlServiceIdLegacyPrefix + PULL_QUERY_METRIC_GROUP,
+        "Count of total partition fetch pull query requests",
+        legacyCustomMetricsTags,
+        new CumulativeCount()
+    );
+    addSensor(
+        sensor,
+        PULL_REQUESTS + "-partition-fetch-rate",
+        ksqlServiceIdLegacyPrefix + PULL_QUERY_METRIC_GROUP,
+        "Rate of total partition fetch pull query requests",
+        legacyCustomMetricsTags,
+        new Rate()
+    );
+
+    // new metrics with ksql service in tags
+    addSensor(
+        sensor,
+        PULL_REQUESTS + "-partition-fetch-count",
+        ksqlServicePrefix + PULL_QUERY_METRIC_GROUP,
+        "Count of total partition fetch pull query requests",
+        customMetricsTags,
+        new CumulativeCount()
+    );
+    addSensor(
+        sensor,
+        PULL_REQUESTS + "-partition-fetch-rate",
+        ksqlServicePrefix + PULL_QUERY_METRIC_GROUP,
+        "Rate of total partition fetch pull query requests",
+        customMetricsTags,
+        new Rate()
+    );
+
+    sensors.add(sensor);
+    return sensor;
+  }
+
+  private Sensor configureResubmissionRequestsSensor() {
+    final Sensor sensor = metrics.sensor(
+        PULL_QUERY_METRIC_GROUP + "-" + PULL_REQUESTS + "-resubmission");
+
+    // legacy
+    addSensor(
+        sensor,
+        PULL_REQUESTS + "-resubmission-count",
+        ksqlServiceIdLegacyPrefix + PULL_QUERY_METRIC_GROUP,
+        "Count of resubmission partition fetch pull query requests",
+        legacyCustomMetricsTags,
+        new CumulativeCount()
+    );
+    addSensor(
+        sensor,
+        PULL_REQUESTS + "-resubmission-rate",
+        ksqlServiceIdLegacyPrefix + PULL_QUERY_METRIC_GROUP,
+        "Rate of resubmission partition fetch pull query requests",
+        legacyCustomMetricsTags,
+        new Rate()
+    );
+
+    // new metrics with ksql service in tags
+    addSensor(
+        sensor,
+        PULL_REQUESTS + "-resubmission-count",
+        ksqlServicePrefix + PULL_QUERY_METRIC_GROUP,
+        "Count of resubmission partition fetch pull query requests",
+        customMetricsTags,
+        new CumulativeCount()
+    );
+    addSensor(
+        sensor,
+        PULL_REQUESTS + "-resubmission-rate",
+        ksqlServicePrefix + PULL_QUERY_METRIC_GROUP,
+        "Rate of resubmission partition fetch pull query requests",
         customMetricsTags,
         new Rate()
     );
