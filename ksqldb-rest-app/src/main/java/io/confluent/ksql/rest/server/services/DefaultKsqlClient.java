@@ -138,6 +138,31 @@ final class DefaultKsqlClient implements SimpleKsqlClient {
   }
 
   @Override
+  public RestResponse<Integer> makeQueryRequest(
+    final URI serverEndPoint,
+    final String sql,
+    final Map<String, ?> configOverrides,
+    final Map<String, ?> requestProperties,
+    final Consumer<List<StreamedRow>> rowConsumer,
+    final CompletableFuture<Void> shouldCloseConnection,
+    final Consumer<List<StreamedRow>> rowConsumer2
+  ) {
+    final KsqlTarget target = sharedClient
+      .target(serverEndPoint)
+      .properties(configOverrides);
+
+    final RestResponse<Integer> resp = getTarget(target, authHeader)
+      .postQueryRequest(sql, requestProperties, Optional.empty(), rowConsumer,
+        shouldCloseConnection);
+
+    if (resp.isErroneous()) {
+      return RestResponse.erroneous(resp.getStatusCode(), resp.getErrorMessage());
+    }
+
+    return RestResponse.successful(resp.getStatusCode(), resp.getResponse());
+  }
+
+  @Override
   public CompletableFuture<RestResponse<BufferedPublisher<StreamedRow>>> makeQueryRequestStreamed(
       final URI serverEndPoint,
       final String sql,

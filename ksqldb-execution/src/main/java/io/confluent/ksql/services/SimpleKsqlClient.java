@@ -80,6 +80,16 @@ public interface SimpleKsqlClient {
       CompletableFuture<Void> shouldCloseConnection
   );
 
+  RestResponse<Integer> makeQueryRequest(
+    URI serverEndPoint,
+    String sql,
+    Map<String, ?> configOverrides,
+    Map<String, ?> requestProperties,
+    Consumer<List<StreamedRow>> rowConsumer,
+    CompletableFuture<Void> shouldCloseConnection,
+    Consumer<List<StreamedRow>> rowConsumer2
+  );
+
   /**
    * Send query request to remote Ksql server.  This method is similar to
    * {@link #makeQueryRequest(URI, String, Map, Map, Consumer, CompletableFuture)}, but gives a

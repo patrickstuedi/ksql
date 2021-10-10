@@ -71,6 +71,19 @@ public final class DisabledKsqlClient implements SimpleKsqlClient {
   }
 
   @Override
+  public RestResponse<Integer> makeQueryRequest(
+    final URI serverEndPoint,
+    final String sql,
+    final Map<String, ?> configOverrides,
+    final Map<String, ?> requestProperties,
+    final Consumer<List<StreamedRow>> rowConsumer,
+    final CompletableFuture<Void> shouldCloseConnection,
+    final Consumer<List<StreamedRow>> rowConsumer2
+  ) {
+    throw new UnsupportedOperationException("KSQL client is disabled");
+  }
+
+  @Override
   public CompletableFuture<RestResponse<BufferedPublisher<StreamedRow>>> makeQueryRequestStreamed(
       final URI serverEndPoint,
       final String sql,

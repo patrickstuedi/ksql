@@ -98,6 +98,19 @@ public class ServerInternalKsqlClient implements SimpleKsqlClient {
   }
 
   @Override
+  public RestResponse<Integer> makeQueryRequest(
+    final URI serverEndpoint,
+    final String sql,
+    final Map<String, ?> configOverrides,
+    final Map<String, ?> requestProperties,
+    final Consumer<List<StreamedRow>> rowConsumer,
+    final CompletableFuture<Void> shouldCloseConnection,
+    final Consumer<List<StreamedRow>> rowConsumer2
+  ) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public CompletableFuture<RestResponse<BufferedPublisher<StreamedRow>>> makeQueryRequestStreamed(
       final URI serverEndPoint,
       final String sql,

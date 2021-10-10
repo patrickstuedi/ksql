@@ -300,7 +300,7 @@ public final class HARouting implements AutoCloseable {
         pullQueryMetrics
           .ifPresent(queryExecutorMetrics -> queryExecutorMetrics.recordRemoteRequests(1));
         forwardTo(node, ImmutableList.of(location), statement, serviceContext,
-            pullQueryQueue, rowFactory, outputSchema, shouldCancelRequests);
+            pullQueryQueue, rowFactory, outputSchema, shouldCancelRequests, pullQueryQueue);
         partitionState.put(location, RoutingResult.SUCCESS);
       } catch (StandbyFallbackException e) {
         LOG.warn("Error forwarding query to node {}. Falling back to standby state which may "
@@ -324,7 +324,8 @@ public final class HARouting implements AutoCloseable {
       final PullQueryQueue pullQueryQueue,
       final BiFunction<List<?>, LogicalSchema, PullQueryRow> rowFactory,
       final LogicalSchema outputSchema,
-      final CompletableFuture<Void> shouldCancelRequests
+      final CompletableFuture<Void> shouldCancelRequests,
+      final PullQueryQueue pullQueryQueue2
   ) {
 
     // Specify the partitions we specifically want to read.  This will prevent reading unintended
@@ -348,7 +349,8 @@ public final class HARouting implements AutoCloseable {
               statement.getSessionConfig().getOverrides(),
               requestProperties,
               streamedRowsHandler(owner, pullQueryQueue, rowFactory, outputSchema),
-              shouldCancelRequests
+              shouldCancelRequests,
+              streamedRowsHandler(owner, pullQueryQueue2, rowFactory, outputSchema)
           );
     } catch (Exception e) {
       // If we threw some explicit exception, then let it bubble up. All of the row handling is
