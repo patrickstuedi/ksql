@@ -300,7 +300,7 @@ public final class HARouting implements AutoCloseable {
                   statement.getStatementText(), node.location(), System.currentTimeMillis());
         pullQueryMetrics
             .ifPresent(queryExecutorMetrics -> queryExecutorMetrics.recordLocalRequests(1));
-        pullPhysicalPlan.execute(locations, pullQueryQueue,  rowFactory);
+        pullPhysicalPlan.execute(locations, pullQueryQueue,  rowFactory, null, null);
         return RoutingResult.SUCCESS;
       } catch (StandbyFallbackException e) {
         LOG.warn("Error executing query locally at node {}. Falling back to standby state which "

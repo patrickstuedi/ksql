@@ -79,11 +79,24 @@ public class PullPhysicalPlan {
   public void execute(
       final List<KsqlPartitionLocation> locations,
       final PullQueryQueue pullQueryQueue,
-      final BiFunction<List<?>, LogicalSchema, PullQueryRow> rowFactory) {
+      final BiFunction<List<?>, LogicalSchema, PullQueryRow> rowFactory,
+      final VersionVector clientOffsets,
+      VersionVector resultOffsets) {
 
     // We only know at runtime which partitions to get from which node.
     // That's why we need to set this explicitly for the dataSource operators
-    dataSourceOperator.setPartitionLocations(locations);
+
+    //Depending on final design of the partition fetching PR (#8161) we may do one of two things here:
+    //Option a: we check if we are are sufficiently up-to-date with respect to the client offsets, if not we abort and throw an exception
+    //-that works if we assume that we always call execute on a small set of a partitions locations (presumably just 1) and we expect
+    //the entire call to either succeed or fail (this is what currently is implemented in #8161)
+    verifyConsistency(locations, mat, clientOffsets);
+    //Option b: we compute the set of partitions for which we are up-to-date and continue to materialize those
+    //-that works if we add a way to return which partitions we have successfully materialized
+    //-Personally I prefer this option, I started working on a branch of PR #8161 to make this happen but couldn't compete yet
+    final List<KsqlPartitionLocation> consistentLocations = getConsistentLocations(locations, clientOffsets);
+
+    dataSourceOperator.setPartitionLocations(consistentLocations);
 
     open();
     List<?> row;
@@ -99,7 +112,21 @@ public class PullPhysicalPlan {
         LOGGER.info("Failed to queue row");
       }
     }
+
     close();
+    updateResultVersionVector(resultOffsets, mat, consistentLocations);
+  }
+
+  //Option a: either our store is currently sufficiently uptodate or we fail the entire operation
+  private void verifyConsistency(List<KsqlPartitionLocation> locations, Materialization mat, VersionVector inputOffsets) {
+  }
+
+  //Option b: computes those partitions for which we are sufficiently up-to-date
+  private void updateResultVersionVector(VersionVector outputOffsets, Materialization mat, List<KsqlPartitionLocation> consistentLocations) {
+  }
+
+  private List<KsqlPartitionLocation> getConsistentLocations(List<KsqlPartitionLocation> locations, VersionVector inputOffsets) {
+    return locations;
   }
 
   private void open() {
