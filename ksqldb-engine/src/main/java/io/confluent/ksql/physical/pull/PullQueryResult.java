@@ -22,7 +22,7 @@ import io.confluent.ksql.physical.pull.PullPhysicalPlan.PullPhysicalPlanType;
 import io.confluent.ksql.query.PullQueryQueue;
 import io.confluent.ksql.query.QueryId;
 import io.confluent.ksql.schema.ksql.LogicalSchema;
-import io.confluent.ksql.util.ConsistencyOffsetVector;
+import io.confluent.ksql.util.Position;
 import io.confluent.ksql.util.KsqlConstants.QuerySourceType;
 import io.confluent.ksql.util.KsqlConstants.RoutingNodeType;
 import java.util.Objects;
@@ -47,7 +47,7 @@ public class PullQueryResult {
   private final RoutingNodeType routingNodeType;
   private final Supplier<Long> rowsProcessedSupplier;
   private final CompletableFuture<Void> shouldCancelRequests;
-  private final Optional<ConsistencyOffsetVector> consistencyOffsetVector;
+  private final Optional<Position> consistencyOffsetVector;
 
   // This future is used to keep track of all of the callbacks since we allow for adding them both
   // before and after the pull query has been started.  When the pull query has completed, it will
@@ -68,7 +68,7 @@ public class PullQueryResult {
       final RoutingNodeType routingNodeType,
       final Supplier<Long> rowsProcessedSupplier,
       final CompletableFuture<Void> shouldCancelRequests,
-      final Optional<ConsistencyOffsetVector> consistencyOffsetVector
+      final Optional<Position> consistencyOffsetVector
   ) {
     this.schema = schema;
     this.populator = populator;
@@ -97,7 +97,7 @@ public class PullQueryResult {
     return pullQueryQueue;
   }
 
-  public Optional<ConsistencyOffsetVector> getConsistencyOffsetVector() {
+  public Optional<Position> getConsistencyOffsetVector() {
     return consistencyOffsetVector;
   }
 

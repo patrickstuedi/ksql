@@ -53,7 +53,7 @@ import io.confluent.ksql.serde.Format;
 import io.confluent.ksql.serde.FormatFactory;
 import io.confluent.ksql.serde.SerdeFeature;
 import io.confluent.ksql.serde.SerdeFeatures;
-import io.confluent.ksql.util.ConsistencyOffsetVector;
+import io.confluent.ksql.util.Position;
 import io.confluent.ksql.util.StructuredTypesDataProvider;
 import io.confluent.ksql.util.TestDataProvider;
 import io.vertx.core.Context;
@@ -74,7 +74,7 @@ import org.junit.Test;
 import org.junit.rules.RuleChain;
 import org.reactivestreams.Subscription;
 
-public class ConsistencyOffsetVectorFunctionalTest {
+public class PositionFunctionalTest {
 
   private static final StructuredTypesDataProvider TEST_DATA_PROVIDER = new StructuredTypesDataProvider();
   private static final String TEST_TOPIC = TEST_DATA_PROVIDER.topicName();
@@ -102,8 +102,8 @@ public class ConsistencyOffsetVectorFunctionalTest {
   private static final String PULL_QUERY_ON_TABLE =
       "SELECT * from " + AGG_TABLE + " WHERE K=" + AN_AGG_KEY + ";";
 
-  private static final ConsistencyOffsetVector CONSISTENCY_OFFSET_VECTOR =
-      new ConsistencyOffsetVector(2, ImmutableMap.of("dummy",
+  private static final Position CONSISTENCY_OFFSET_VECTOR =
+      new Position(2, ImmutableMap.of("dummy",
                                                      ImmutableMap.of(5, 5L, 6, 6L, 7, 7L)));
   private static final IntegrationTestHarness TEST_HARNESS = IntegrationTestHarness.build();
 
@@ -314,7 +314,7 @@ public class ConsistencyOffsetVectorFunctionalTest {
   }
 
   private static void verifyConsistencyVector(final String serializedCV) {
-    final ConsistencyOffsetVector cvResponse = ConsistencyOffsetVector.deserialize(serializedCV);
+    final Position cvResponse = Position.deserialize(serializedCV);
     assertThat(cvResponse.equals(CONSISTENCY_OFFSET_VECTOR), is(true));
   }
 

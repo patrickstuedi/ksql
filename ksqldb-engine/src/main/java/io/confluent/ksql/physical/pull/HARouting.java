@@ -37,7 +37,7 @@ import io.confluent.ksql.rest.entity.StreamedRow.Header;
 import io.confluent.ksql.schema.ksql.LogicalSchema;
 import io.confluent.ksql.services.ServiceContext;
 import io.confluent.ksql.statement.ConfiguredStatement;
-import io.confluent.ksql.util.ConsistencyOffsetVector;
+import io.confluent.ksql.util.Position;
 import io.confluent.ksql.util.KsqlConfig;
 import io.confluent.ksql.util.KsqlException;
 import io.confluent.ksql.util.KsqlRequestConfig;
@@ -116,7 +116,7 @@ public final class HARouting implements AutoCloseable {
       final QueryId queryId,
       final PullQueryQueue pullQueryQueue,
       final CompletableFuture<Void> shouldCancelRequests,
-      final Optional<ConsistencyOffsetVector> consistencyOffsetVector
+      final Optional<Position> consistencyOffsetVector
   ) {
     final List<KsqlPartitionLocation> allLocations = pullPhysicalPlan.getMaterialization().locator()
         .locate(
@@ -179,7 +179,7 @@ public final class HARouting implements AutoCloseable {
       final List<KsqlPartitionLocation> locations,
       final PullQueryQueue pullQueryQueue,
       final CompletableFuture<Void> shouldCancelRequests,
-      final Optional<ConsistencyOffsetVector> consistencyOffsetVector
+      final Optional<Position> consistencyOffsetVector
   ) throws InterruptedException {
     final ExecutorCompletionService<PartitionFetchResult> completionService =
         new ExecutorCompletionService<>(routerExecutorService);
@@ -256,7 +256,7 @@ public final class HARouting implements AutoCloseable {
         QueryId queryId,
         PullQueryQueue pullQueryQueue,
         CompletableFuture<Void> shouldCancelRequests,
-        Optional<ConsistencyOffsetVector> consistencyOffsetVector
+        Optional<Position> consistencyOffsetVector
     );
   }
 
@@ -274,7 +274,7 @@ public final class HARouting implements AutoCloseable {
       final QueryId queryId,
       final PullQueryQueue pullQueryQueue,
       final CompletableFuture<Void> shouldCancelRequests,
-      final Optional<ConsistencyOffsetVector> consistencyOffsetVector
+      final Optional<Position> consistencyOffsetVector
   ) {
     final BiFunction<List<?>, LogicalSchema, PullQueryRow> rowFactory = (rawRow, schema) ->
         new PullQueryRow(rawRow, schema, Optional.ofNullable(
@@ -332,7 +332,7 @@ public final class HARouting implements AutoCloseable {
       final BiFunction<List<?>, LogicalSchema, PullQueryRow> rowFactory,
       final LogicalSchema outputSchema,
       final CompletableFuture<Void> shouldCancelRequests,
-      final Optional<ConsistencyOffsetVector> consistencyOffsetVector
+      final Optional<Position> consistencyOffsetVector
   ) {
 
     // Specify the partitions we specifically want to read.  This will prevent reading unintended
@@ -514,7 +514,7 @@ public final class HARouting implements AutoCloseable {
     }
   }
 
-  private void updateConsistencyOffsetVectorDummy(final ConsistencyOffsetVector ct) {
+  private void updateConsistencyOffsetVectorDummy(final Position ct) {
     ct.setVersion(2);
     ct.addTopicOffsets("dummy", ImmutableMap.of(5, 5L, 6, 6L, 7, 7L));
   }

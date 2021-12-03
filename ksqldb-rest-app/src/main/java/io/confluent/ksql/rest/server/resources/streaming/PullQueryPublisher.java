@@ -41,7 +41,7 @@ import io.confluent.ksql.rest.util.ConcurrencyLimiter;
 import io.confluent.ksql.rest.util.ConcurrencyLimiter.Decrementer;
 import io.confluent.ksql.services.ServiceContext;
 import io.confluent.ksql.statement.ConfiguredStatement;
-import io.confluent.ksql.util.ConsistencyOffsetVector;
+import io.confluent.ksql.util.Position;
 import io.confluent.ksql.util.KeyValueMetadata;
 import io.confluent.ksql.util.KsqlConstants.KsqlQueryType;
 import io.confluent.ksql.util.KsqlConstants.QuerySourceType;
@@ -65,7 +65,7 @@ class PullQueryPublisher implements Flow.Publisher<Collection<StreamedRow>> {
   private final ConcurrencyLimiter concurrencyLimiter;
   private final SlidingWindowRateLimiter pullBandRateLimiter;
   private final HARouting routing;
-  private final Optional<ConsistencyOffsetVector> consistencyOffsetVector;
+  private final Optional<Position> consistencyOffsetVector;
 
   @VisibleForTesting
   // CHECKSTYLE_RULES.OFF: ParameterNumberCheck
@@ -83,7 +83,7 @@ class PullQueryPublisher implements Flow.Publisher<Collection<StreamedRow>> {
       final ConcurrencyLimiter concurrencyLimiter,
       final SlidingWindowRateLimiter pullBandRateLimiter,
       final HARouting routing,
-      final Optional<ConsistencyOffsetVector> consistencyOffsetVector
+      final Optional<Position> consistencyOffsetVector
   ) {
     this.ksqlEngine = requireNonNull(ksqlEngine, "ksqlEngine");
     this.serviceContext = requireNonNull(serviceContext, "serviceContext");

@@ -17,7 +17,7 @@ package io.confluent.ksql.query;
 
 import io.confluent.ksql.GenericRow;
 import io.confluent.ksql.physical.pull.PullQueryRow;
-import io.confluent.ksql.util.ConsistencyOffsetVector;
+import io.confluent.ksql.util.Position;
 import io.confluent.ksql.util.KeyValue;
 import io.confluent.ksql.util.KeyValueMetadata;
 import io.confluent.ksql.util.RowMetadata;
@@ -235,9 +235,9 @@ public class PullQueryQueue implements BlockingRowQueue {
     }
   }
 
-  public void putConsistencyVector(final ConsistencyOffsetVector consistencyOffsetVector) {
+  public void putConsistencyVector(final Position position) {
     try {
-      rowQueue.put(new PullQueryRow(null, null, null, Optional.of(consistencyOffsetVector)));
+      rowQueue.put(new PullQueryRow(null, null, null, Optional.of(position)));
     } catch (InterruptedException e) {
       LOG.error("Interrupted while trying to put consistency token into queue", e);
       Thread.currentThread().interrupt();

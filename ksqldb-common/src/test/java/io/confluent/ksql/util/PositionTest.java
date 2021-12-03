@@ -22,19 +22,19 @@ import com.google.common.collect.ImmutableMap;
 import org.hamcrest.CoreMatchers;
 import org.junit.Test;
 
-public class ConsistencyOffsetVectorTest {
+public class PositionTest {
 
   @Test
   public void shouldSerializeAndDeserialize() {
     // Given:
-    final ConsistencyOffsetVector offsetVector = new ConsistencyOffsetVector();
+    final Position offsetVector = new Position();
 
     offsetVector.setVersion(1);
     offsetVector.addTopicOffsets("testTopic", ImmutableMap.of(1, 1L, 2, 2L, 3, 3L));
 
     // When:
-    final ConsistencyOffsetVector deserializedCV =
-        ConsistencyOffsetVector.deserialize(offsetVector.serialize());
+    final Position deserializedCV =
+        Position.deserialize(offsetVector.serialize());
 
     // Then:
     assertThat(deserializedCV.equals(offsetVector), is(true));
@@ -43,12 +43,12 @@ public class ConsistencyOffsetVectorTest {
   @Test
   public void shouldDominateIfGreater() {
     // Given:
-    final ConsistencyOffsetVector offsetVector = new ConsistencyOffsetVector();
+    final Position offsetVector = new Position();
     offsetVector.update("testTopic", 0, 1);
     offsetVector.update("testTopic", 1, 2);
     offsetVector.update("testTopic", 2, 1);
 
-    final ConsistencyOffsetVector other = new ConsistencyOffsetVector();
+    final Position other = new Position();
     other.update("testTopic", 0, 1);
     other.update("testTopic", 1, 1);
     other.update("testTopic", 2, 1);
@@ -60,12 +60,12 @@ public class ConsistencyOffsetVectorTest {
   @Test
   public void shouldDominateIfEqual() {
     // Given:
-    final ConsistencyOffsetVector offsetVector = new ConsistencyOffsetVector();
+    final Position offsetVector = new Position();
     offsetVector.update("testTopic", 0, 1);
     offsetVector.update("testTopic", 1, 2);
     offsetVector.update("testTopic", 2, 1);
 
-    final ConsistencyOffsetVector other = new ConsistencyOffsetVector();
+    final Position other = new Position();
     other.update("testTopic", 0, 1);
     other.update("testTopic", 1, 2);
     other.update("testTopic", 2, 1);
@@ -77,12 +77,12 @@ public class ConsistencyOffsetVectorTest {
   @Test
   public void shouldNotDominateIfLess() {
     // Given:
-    final ConsistencyOffsetVector offsetVector = new ConsistencyOffsetVector();
+    final Position offsetVector = new Position();
     offsetVector.update("testTopic", 0, 1);
     offsetVector.update("testTopic", 1, 1);
     offsetVector.update("testTopic", 2, 1);
 
-    final ConsistencyOffsetVector other = new ConsistencyOffsetVector();
+    final Position other = new Position();
     other.update("testTopic", 0, 1);
     other.update("testTopic", 1, 2);
     other.update("testTopic", 2, 1);
@@ -94,12 +94,12 @@ public class ConsistencyOffsetVectorTest {
   @Test
   public void shouldDominateWithPartitionMissing() {
     // Given:
-    final ConsistencyOffsetVector offsetVector = new ConsistencyOffsetVector();
+    final Position offsetVector = new Position();
     offsetVector.update("testTopic", 0, 1);
     offsetVector.update("testTopic", 1, 2);
     offsetVector.update("testTopic", 2, 1);
 
-    final ConsistencyOffsetVector other = new ConsistencyOffsetVector();
+    final Position other = new Position();
     other.update("testTopic", 0, 1);
     other.update("testTopic", 2, 1);
 
@@ -110,14 +110,14 @@ public class ConsistencyOffsetVectorTest {
   @Test
   public void shouldDominateWithTopicMissing() {
     // Given:
-    final ConsistencyOffsetVector offsetVector = new ConsistencyOffsetVector();
+    final Position offsetVector = new Position();
     offsetVector.update("testTopic1", 0, 1);
     offsetVector.update("testTopic1", 1, 2);
     offsetVector.update("testTopic1", 2, 1);
     offsetVector.update("testTopic2", 0, 2);
     offsetVector.update("testTopic2", 1, 1);
 
-    final ConsistencyOffsetVector other = new ConsistencyOffsetVector();
+    final Position other = new Position();
     other.update("testTopic1", 0, 1);
     other.update("testTopic1", 2, 1);
 
@@ -128,18 +128,18 @@ public class ConsistencyOffsetVectorTest {
   @Test
   public void shouldMerge() {
     // Given:
-    final ConsistencyOffsetVector offsetVector = new ConsistencyOffsetVector();
+    final Position offsetVector = new Position();
     offsetVector.update("testTopic1", 0, 1);
     offsetVector.update("testTopic1", 1, 2);
     offsetVector.update("testTopic1", 2, 1);
 
-    final ConsistencyOffsetVector other = new ConsistencyOffsetVector();
+    final Position other = new Position();
     other.update("testTopic1", 2, 2);
     other.update("testTopic2", 0, 1);
 
     offsetVector.merge(other);
 
-    final ConsistencyOffsetVector mergedVector = new ConsistencyOffsetVector();
+    final Position mergedVector = new Position();
     mergedVector.update("testTopic1", 0, 1);
     mergedVector.update("testTopic1", 1, 2);
     mergedVector.update("testTopic1", 2, 2);

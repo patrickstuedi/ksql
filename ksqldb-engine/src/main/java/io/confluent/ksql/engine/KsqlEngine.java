@@ -56,7 +56,7 @@ import io.confluent.ksql.query.QueryId;
 import io.confluent.ksql.query.id.QueryIdGenerator;
 import io.confluent.ksql.services.ServiceContext;
 import io.confluent.ksql.statement.ConfiguredStatement;
-import io.confluent.ksql.util.ConsistencyOffsetVector;
+import io.confluent.ksql.util.Position;
 import io.confluent.ksql.util.KsqlConfig;
 import io.confluent.ksql.util.KsqlException;
 import io.confluent.ksql.util.KsqlServerException;
@@ -483,7 +483,7 @@ public class KsqlEngine implements KsqlExecutionContext, Closeable {
       final QueryPlannerOptions plannerOptions,
       final Optional<PullQueryExecutorMetrics> pullQueryMetrics,
       final boolean startImmediately,
-      final Optional<ConsistencyOffsetVector> consistencyOffsetVector
+      final Optional<Position> consistencyOffsetVector
   ) {
     return EngineExecutor
         .create(

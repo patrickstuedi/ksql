@@ -56,7 +56,7 @@ import io.confluent.ksql.rest.util.ScalablePushUtil;
 import io.confluent.ksql.security.KsqlAuthorizationValidator;
 import io.confluent.ksql.security.KsqlSecurityContext;
 import io.confluent.ksql.statement.ConfiguredStatement;
-import io.confluent.ksql.util.ConsistencyOffsetVector;
+import io.confluent.ksql.util.Position;
 import io.confluent.ksql.util.KsqlConfig;
 import io.confluent.ksql.util.KsqlConstants.KsqlQueryType;
 import io.confluent.ksql.util.KsqlConstants.QuerySourceType;
@@ -302,7 +302,7 @@ public class WSQueryEndpoint {
       final DataSource dataSource = analysis.getFrom().getDataSource();
       final DataSource.DataSourceType dataSourceType = dataSource.getDataSourceType();
       final Map<String, Object> requestProperties = info.request.getRequestProperties();
-      Optional<ConsistencyOffsetVector> consistencyOffsetVector = Optional.empty();
+      Optional<Position> consistencyOffsetVector = Optional.empty();
       if (ksqlConfig.getBoolean(KsqlConfig.KSQL_QUERY_PULL_CONSISTENCY_OFFSET_VECTOR_ENABLED)
           && requestProperties.containsKey(
           KsqlRequestConfig.KSQL_REQUEST_QUERY_PULL_CONSISTENCY_OFFSET_VECTOR)) {
@@ -311,8 +311,8 @@ public class WSQueryEndpoint {
         // serializedCV will be empty on the first request as the consistency vector is initialized
         // at the server
         consistencyOffsetVector = !serializedCV.equals("")
-            ? Optional.of(ConsistencyOffsetVector.deserialize(serializedCV))
-            : Optional.of(new ConsistencyOffsetVector());
+            ? Optional.of(Position.deserialize(serializedCV))
+            : Optional.of(new Position());
       }
       switch (dataSourceType) {
         case KTABLE: {

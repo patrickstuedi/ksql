@@ -28,7 +28,7 @@ import io.confluent.ksql.planner.plan.LookupConstraint;
 import io.confluent.ksql.query.PullQueryQueue;
 import io.confluent.ksql.query.QueryId;
 import io.confluent.ksql.schema.ksql.LogicalSchema;
-import io.confluent.ksql.util.ConsistencyOffsetVector;
+import io.confluent.ksql.util.Position;
 import io.confluent.ksql.util.KsqlConstants.QuerySourceType;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -83,7 +83,7 @@ public class PullPhysicalPlan {
       final List<KsqlPartitionLocation> locations,
       final PullQueryQueue pullQueryQueue,
       final BiFunction<List<?>, LogicalSchema, PullQueryRow> rowFactory,
-      final Optional<ConsistencyOffsetVector> consistencyOffsetVector) {
+      final Optional<Position> consistencyOffsetVector) {
 
     // We only know at runtime which partitions to get from which node.
     // That's why we need to set this explicitly for the dataSource operators

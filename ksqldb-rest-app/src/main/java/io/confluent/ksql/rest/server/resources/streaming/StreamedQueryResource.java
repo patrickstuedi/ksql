@@ -61,7 +61,7 @@ import io.confluent.ksql.security.KsqlAuthorizationValidator;
 import io.confluent.ksql.security.KsqlSecurityContext;
 import io.confluent.ksql.services.ServiceContext;
 import io.confluent.ksql.statement.ConfiguredStatement;
-import io.confluent.ksql.util.ConsistencyOffsetVector;
+import io.confluent.ksql.util.Position;
 import io.confluent.ksql.util.KsqlConfig;
 import io.confluent.ksql.util.KsqlConstants.KsqlQueryType;
 import io.confluent.ksql.util.KsqlException;
@@ -491,7 +491,7 @@ public class StreamedQueryResource implements KsqlConfigurable {
       pullBandRateLimiter.allow(KsqlQueryType.PULL);
 
       final Optional<Decrementer> optionalDecrementer = Optional.ofNullable(decrementer);
-      Optional<ConsistencyOffsetVector> consistencyOffsetVector = Optional.empty();
+      Optional<Position> consistencyOffsetVector = Optional.empty();
       if (ksqlConfig.getBoolean(KsqlConfig.KSQL_QUERY_PULL_CONSISTENCY_OFFSET_VECTOR_ENABLED)
           && requestProperties.containsKey(
               KsqlRequestConfig.KSQL_REQUEST_QUERY_PULL_CONSISTENCY_OFFSET_VECTOR)) {
@@ -500,8 +500,8 @@ public class StreamedQueryResource implements KsqlConfigurable {
         // serializedCV will be empty on the first request as the consistency vector is initialized
         // at the server
         consistencyOffsetVector = !serializedCV.equals("")
-            ? Optional.of(ConsistencyOffsetVector.deserialize(serializedCV))
-            : Optional.of(new ConsistencyOffsetVector());
+            ? Optional.of(Position.deserialize(serializedCV))
+            : Optional.of(new Position());
       }
       final PullQueryResult result = ksqlEngine.executeTablePullQuery(
           analysis,

@@ -60,7 +60,7 @@ import io.confluent.ksql.serde.SerdeFeatures;
 import io.confluent.ksql.test.util.KsqlIdentifierTestUtil;
 import io.confluent.ksql.test.util.KsqlTestFolder;
 import io.confluent.ksql.test.util.TestBasicJaasConfig;
-import io.confluent.ksql.util.ConsistencyOffsetVector;
+import io.confluent.ksql.util.Position;
 import io.confluent.ksql.util.KsqlConfig;
 import io.confluent.ksql.util.KsqlRequestConfig;
 import io.confluent.ksql.util.UserDataProvider;
@@ -78,7 +78,6 @@ import java.util.stream.Collectors;
 import kafka.zookeeper.ZooKeeperClientException;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.streams.StreamsConfig;
-import org.checkerframework.checker.units.qual.C;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -315,7 +314,7 @@ public class PullQueryConsistencyFunctionalTest {
     // When:
     final KsqlRestClient restClient = clusterFormation.router.getApp().buildKsqlClient(USER_CREDS);
     restClient.setProperty(KSQL_QUERY_PULL_CONSISTENCY_OFFSET_VECTOR_ENABLED, true);
-    ConsistencyOffsetVector offsetVector = new ConsistencyOffsetVector();
+    Position offsetVector = new Position();
     offsetVector.update("bla", 0, 0);
     final RestResponse<List<StreamedRow>> res = restClient.makeQueryRequest(sqlTableScan, 1L, null, ImmutableMap.of(KsqlRequestConfig.KSQL_REQUEST_QUERY_PULL_CONSISTENCY_OFFSET_VECTOR, ""));
     List<StreamedRow> rows = res.getResponse();
@@ -330,8 +329,8 @@ public class PullQueryConsistencyFunctionalTest {
     // Then:
     assertThat(rows, hasSize(HEADER + 6));
     assertThat(rows.get(HEADER+5).getConsistencyToken(), is(not(Optional.empty())));
-    ConsistencyOffsetVector receivedVector = ConsistencyOffsetVector.deserialize(rows.get(HEADER+5).getConsistencyToken().get().getConsistencyToken());
-    ConsistencyOffsetVector expectedVector = new ConsistencyOffsetVector();
+    Position receivedVector = Position.deserialize(rows.get(HEADER+5).getConsistencyToken().get().getConsistencyToken());
+    Position expectedVector = new Position();
     expectedVector.setVersion(2);
     expectedVector.addTopicOffsets("dummy", ImmutableMap.of(5, 5L, 6, 6L, 7, 7L));
     assertThat(receivedVector, is(expectedVector));

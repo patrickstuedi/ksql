@@ -56,7 +56,7 @@ import io.confluent.ksql.schema.ksql.Column;
 import io.confluent.ksql.schema.utils.FormatOptions;
 import io.confluent.ksql.services.ServiceContext;
 import io.confluent.ksql.statement.ConfiguredStatement;
-import io.confluent.ksql.util.ConsistencyOffsetVector;
+import io.confluent.ksql.util.Position;
 import io.confluent.ksql.util.KsqlConfig;
 import io.confluent.ksql.util.KsqlConstants.KsqlQueryType;
 import io.confluent.ksql.util.KsqlRequestConfig;
@@ -149,7 +149,7 @@ public class QueryEndpoint {
               statement.getStatement(), statement.getStatementText(), properties);
       final DataSource dataSource = analysis.getFrom().getDataSource();
       final DataSource.DataSourceType dataSourceType = dataSource.getDataSourceType();
-      Optional<ConsistencyOffsetVector> consistencyOffsetVector = Optional.empty();
+      Optional<Position> consistencyOffsetVector = Optional.empty();
       if (ksqlConfig.getBoolean(KsqlConfig.KSQL_QUERY_PULL_CONSISTENCY_OFFSET_VECTOR_ENABLED)
           && requestProperties.containsKey(
               KsqlRequestConfig.KSQL_REQUEST_QUERY_PULL_CONSISTENCY_OFFSET_VECTOR)) {
@@ -158,8 +158,8 @@ public class QueryEndpoint {
         // serializedCV will be null on the first request as the consistency vector is initialized
         // at the server
         consistencyOffsetVector = serializedCV != null
-            ? Optional.of(ConsistencyOffsetVector.deserialize(serializedCV))
-            : Optional.of(new ConsistencyOffsetVector());
+            ? Optional.of(Position.deserialize(serializedCV))
+            : Optional.of(new Position());
       }
       switch (dataSourceType) {
         case KTABLE:
@@ -328,7 +328,7 @@ public class QueryEndpoint {
       final Optional<PullQueryExecutorMetrics> pullQueryMetrics,
       final WorkerExecutor workerExecutor,
       final MetricsCallbackHolder metricsCallbackHolder,
-      final Optional<ConsistencyOffsetVector> consistencyOffsetVector
+      final Optional<Position> consistencyOffsetVector
   ) {
     // First thing, set the metrics callback so that it gets called, even if we hit an error
     final AtomicReference<PullQueryResult> resultForMetrics = new AtomicReference<>(null);
@@ -467,7 +467,7 @@ public class QueryEndpoint {
     }
 
     @Override
-    public Optional<ConsistencyOffsetVector> getConsistencyOffsetVector() {
+    public Optional<Position> getConsistencyOffsetVector() {
       return Optional.empty();
     }
   }
@@ -530,7 +530,7 @@ public class QueryEndpoint {
     }
 
     @Override
-    public Optional<ConsistencyOffsetVector> getConsistencyOffsetVector() {
+    public Optional<Position> getConsistencyOffsetVector() {
       return result.getConsistencyOffsetVector();
     }
   }
@@ -595,7 +595,7 @@ public class QueryEndpoint {
     }
 
     @Override
-    public Optional<ConsistencyOffsetVector> getConsistencyOffsetVector() {
+    public Optional<Position> getConsistencyOffsetVector() {
       return Optional.empty();
     }
   }

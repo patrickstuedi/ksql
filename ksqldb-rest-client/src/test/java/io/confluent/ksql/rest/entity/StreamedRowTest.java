@@ -27,7 +27,7 @@ import io.confluent.ksql.rest.ApiJsonMapper;
 import io.confluent.ksql.rest.client.KsqlClient;
 import io.confluent.ksql.schema.ksql.LogicalSchema;
 import io.confluent.ksql.schema.ksql.types.SqlTypes;
-import io.confluent.ksql.util.ConsistencyOffsetVector;
+import io.confluent.ksql.util.Position;
 import java.math.BigDecimal;
 import java.util.Optional;
 import org.junit.Test;
@@ -49,7 +49,7 @@ public class StreamedRowTest {
       .valueColumn(ColumnName.of("VAL"), SqlTypes.STRING)
       .build();
 
-  private static final ConsistencyOffsetVector CONSISTENCY_TOKEN = new ConsistencyOffsetVector();
+  private static final Position CONSISTENCY_TOKEN = new Position();
 
   @Test
   public void shouldRoundTripPullHeader() throws Exception {

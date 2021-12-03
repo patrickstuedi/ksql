@@ -17,7 +17,7 @@ package io.confluent.ksql.api.server;
 
 import io.confluent.ksql.query.BlockingRowQueue;
 import io.confluent.ksql.query.QueryId;
-import io.confluent.ksql.util.ConsistencyOffsetVector;
+import io.confluent.ksql.util.Position;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -41,5 +41,5 @@ public interface QueryHandle {
 
   QueryId getQueryId();
 
-  Optional<ConsistencyOffsetVector> getConsistencyOffsetVector();
+  Optional<Position> getConsistencyOffsetVector();
 }

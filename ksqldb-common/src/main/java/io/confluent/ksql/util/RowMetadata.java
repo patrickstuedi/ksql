@@ -24,11 +24,11 @@ import java.util.Optional;
 public class RowMetadata {
 
   private final Optional<PushOffsetRange> pushOffsetsRange;
-  private final Optional<ConsistencyOffsetVector> consistencyOffsetVector;
+  private final Optional<Position> consistencyOffsetVector;
 
   public RowMetadata(
       final Optional<PushOffsetRange> pushOffsetsRange,
-      final Optional<ConsistencyOffsetVector> consistencyOffsetVector
+      final Optional<Position> consistencyOffsetVector
   ) {
     this.pushOffsetsRange = pushOffsetsRange;
     this.consistencyOffsetVector = consistencyOffsetVector;
@@ -38,7 +38,7 @@ public class RowMetadata {
     return pushOffsetsRange;
   }
 
-  public Optional<ConsistencyOffsetVector> getConsistencyOffsetVector() {
+  public Optional<Position> getConsistencyOffsetVector() {
     return consistencyOffsetVector;
   }
 

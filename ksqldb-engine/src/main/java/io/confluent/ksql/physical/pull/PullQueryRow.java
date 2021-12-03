@@ -19,7 +19,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.confluent.ksql.GenericRow;
 import io.confluent.ksql.execution.streams.materialization.Locator.KsqlNode;
 import io.confluent.ksql.schema.ksql.LogicalSchema;
-import io.confluent.ksql.util.ConsistencyOffsetVector;
+import io.confluent.ksql.util.Position;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -29,14 +29,14 @@ public class PullQueryRow {
   private final List<?> row;
   private final LogicalSchema schema;
   private final Optional<KsqlNode> sourceNode;
-  private final Optional<ConsistencyOffsetVector> consistencyOffsetVector;
+  private final Optional<Position> consistencyOffsetVector;
 
   @SuppressFBWarnings(value = "EI_EXPOSE_REP2")
   public PullQueryRow(
       final List<?> row,
       final LogicalSchema schema,
       final Optional<KsqlNode> sourceNode,
-      final Optional<ConsistencyOffsetVector> consistencyOffsetVector
+      final Optional<Position> consistencyOffsetVector
   ) {
     this.row = row;
     this.schema = schema;
@@ -56,7 +56,7 @@ public class PullQueryRow {
     return sourceNode;
   }
 
-  public Optional<ConsistencyOffsetVector> getConsistencyOffsetVector() {
+  public Optional<Position> getConsistencyOffsetVector() {
     return consistencyOffsetVector;
   }
 

@@ -34,7 +34,7 @@ import io.confluent.ksql.rest.entity.ServerClusterId;
 import io.confluent.ksql.rest.entity.ServerInfo;
 import io.confluent.ksql.rest.entity.ServerMetadata;
 import io.confluent.ksql.rest.entity.StreamedRow;
-import io.confluent.ksql.util.ConsistencyOffsetVector;
+import io.confluent.ksql.util.Position;
 import io.confluent.ksql.util.KsqlRequestConfig;
 import io.vertx.core.http.HttpClientOptions;
 import io.vertx.core.http.HttpVersion;
@@ -199,7 +199,7 @@ public final class KsqlRestClient implements Closeable {
   ) {
     KsqlTarget target = target();
     final Map<String, Object> requestProperties = new HashMap<>();
-    if (ConsistencyOffsetVector.isConsistencyVectorEnabled(localProperties.toMap())) {
+    if (Position.isConsistencyVectorEnabled(localProperties.toMap())) {
       final String serializedCV = serializedConsistencyVector.get();
       // KsqlRequest:serializeClassValues throws NPE for null value
       requestProperties.put(KsqlRequestConfig.KSQL_REQUEST_QUERY_PULL_CONSISTENCY_OFFSET_VECTOR,
